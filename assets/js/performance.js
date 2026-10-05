@@ -32,6 +32,30 @@ window.SpaceVoyagePerf = (function () {
     var savedQuaternion = camera.quaternion.clone();
     var previousTarget = renderer.getRenderTarget();
     renderer.setRenderTarget(warmTarget);
+
+    // Force one covered draw of every renderable before the representative route views. Parent
+    // visibility is enabled too so a hidden group cannot prevent one of its meshes from reaching
+    // the renderer. All state is restored immediately after this single pass.
+    var savedObjectState = [];
+    scene.traverse(function (object) {
+      savedObjectState.push({
+        object: object,
+        visible: object.visible,
+        frustumCulled: object.frustumCulled
+      });
+      object.visible = true;
+      if (object.isMesh || object.isPoints || object.isSprite) object.frustumCulled = false;
+    });
+    camera.position.set(0, 12, -3000);
+    target.set(0, 8, -3050);
+    camera.lookAt(target);
+    skyDome.position.copy(camera.position);
+    renderer.render(scene, camera);
+    savedObjectState.forEach(function (state) {
+      state.object.visible = state.visible;
+      state.object.frustumCulled = state.frustumCulled;
+    });
+
     views.forEach(function (view) {
       camera.position.fromArray(view.p);
       target.fromArray(view.t);
@@ -44,7 +68,7 @@ window.SpaceVoyagePerf = (function () {
     camera.position.copy(savedPosition);
     camera.quaternion.copy(savedQuaternion);
     skyDome.position.copy(camera.position);
-    return { textureCount: resources.textures.length, geometryCount: resources.geometries.length, warmPasses: views.length };
+    return { textureCount: resources.textures.length, geometryCount: resources.geometries.length, warmPasses: views.length + 1 };
   }
 
   return { warm: warm };
